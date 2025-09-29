@@ -1,31 +1,49 @@
 import axios from "axios";
+import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 
-const form = document.querySelector("form") as HTMLFormElement;
-const addressInput = document.getElementById("address") as HTMLInputElement;
-const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+type latLng = { lat: number; lng: number };
 type googleGeoCodingRes = {
-  results: { geometry: { location: { lat: number; lng: number } } }[];
+  results: { geometry: { location: latLng } }[];
   status: "OK" | "ZERO_RESULTS";
 };
 
-function searchAddressHandler(event: Event) {
+const form = document.querySelector("form") as HTMLFormElement;
+const addressInput = document.getElementById("address") as HTMLInputElement;
+const mapEl = document.getElementById("map") as HTMLDivElement;
+const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+
+setOptions({ key: GOOGLE_API_KEY, v: "weekly" });
+const { Map } = await importLibrary("maps");
+await google.maps.importLibrary("marker");
+
+async function searchAddressHandler(event: Event) {
   event.preventDefault();
   const enteredAddress = encodeURI(addressInput.value);
 
-  axios
-    .get<googleGeoCodingRes>(
+  try {
+    const response = await axios.get<googleGeoCodingRes>(
       `https://maps.googleapis.com/maps/api/geocode/json?address=${enteredAddress}&key=${GOOGLE_API_KEY}`
-    )
-    .then((response) => {
-      if (response.data.status !== "OK")
-        throw new Error("Could not fetch location!");
+    );
 
-      const coordinates = response.data.results[0].geometry.location;
-    })
-    .catch((error) => {
-      alert(error.message);
-      console.log(error);
+    if (response.data.status !== "OK")
+      throw new Error("Could not fetch location!");
+
+    const coordinates = response.data.results[0].geometry.location;
+
+    const map = new Map(mapEl, {
+      center: coordinates,
+      zoom: 15,
+      mapId: crypto.randomUUID(),
     });
+
+    new google.maps.marker.AdvancedMarkerElement({
+      map,
+      position: coordinates,
+    });
+  } catch (error: any) {
+    alert(error.message);
+    console.log(error);
+  }
 }
 
 form.addEventListener("submit", searchAddressHandler);
